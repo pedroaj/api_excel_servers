@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    
+    <title>Welcome to Servers List API</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <style>
+      table { border: 1px solid #ccc; }
+      table td, table th { border: 1px solid #ccc; }
+    </style>
+  
+  </head>
+  <body>
+    <div class="container">
+
+    <h1 class="mt-5">Servers List API</h1>
+
+    <form id="filters_form" method="POST">
+
+      {% for filter in filters %}
+      <div class="form-group col-md-6 mt-3">
+        <label>{{ filter.name }}</label>:
+        {% if filter.type == 'range slider' %}
+
+          <input type="range" id="range" name="range" min="{{ filter.values|first }}" max="{{ filter.values|length - 1 }}" step="1" class="form-control-range">
+          <input type="hidden" id="range_value" name="range_value">
+          <output id="selected_value">{{ filter.defaultValue }}</output>
+
+          <br><br>
+        {% elseif filter.name == 'RAM (GB)' %}
+
+          <div class="form-check form-check-inline">
+          {% for value in filter.values %}
+
+            <input type="radio" class="filter_ram form-check-input" name="filter[ram]" value="{{ value }}" {{ filter.defaultValue == value ? 'checked' }}> {{ value }}    
+
+          {% endfor %}
+          </div>
+          <br>
+
+        {% elseif filter.name == 'Hard disk type' %}
+
+          <select id="filter_hdd_type" name="filter[{{ filter.name }}]" class="select_hdd_type form-control">
+            {% for value in filter.values %}
+              <option value="{{ value }}" {{ filter.defaultValue == value ? 'selected' }}>{{ value }}</option>
+            {% endfor %}
+          </select>
+
+        {% endif %}
+      </div>
+      <br>
+      {% endfor %}
+
+      <button type="button" class="btn btn-primary" id="form_button">Go</button>
+
+    </form>
+
+    <br>
+
+    <div id="resultsFromExcel" style="display: none;">
+        <table id="resultsTable" class="table mt-5">
+            <thead class="thead-dark">
+            <tr>
+                <th>Model</th>
+                <th>RAM</th>
+                <th>HDD</th>
+                <th>Location</th>
+                <th>Price</th>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+
+  </div>
+
+
+  </body>
+</html>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+
+<script>
+  const rangeInput = document.getElementById('range');
+  const selectedValue = document.getElementById('selected_value');
+  const fixedValues = {{ filters[0].values|json_encode|raw }}; // Convert the values to a JavaScript array
+  const rangeValue = document.getElementById('range_value');
+
+  rangeInput.addEventListener('input', function() {
+      const selectedIdx = parseInt(this.value);
+      selectedValue.textContent = fixedValues[selectedIdx];
+      rangeValue.value = fixedValues[selectedIdx];
+  });
+
+  function setValues() // in case the user does not modify the hard disk space range the value still gets passed
+  {
+    //console.log("Setting values! selectedValue: ", selectedValue.value);
+    rangeValue.value = selectedValue.value;
+    //filters_form.submit();
+  }
+
+  $(document).ready(function()
+  {
+    $('#form_button').click(function()
+    {
+      setValues();
+
+      var range_value = $('#range_value').val();
+      var ram_value = $('input[class*="filter_ram"]:checked').val();
+      var hdd_type_value = $('#filter_hdd_type').val();
+
+      $.ajax({
+        url: '{{ path('excel_controller') }}',
+        type: 'POST',
+        data: {
+                range_value: range_value,
+                ram_value: ram_value,
+                hdd_type_value: hdd_type_value
+            },
+        dataType: 'json',
+        success: function(result, textStatus, jqXHR)
+        {
+          /*
+          [Model] => Dell R210Intel Xeon X3440
+          [RAM] => 16GBDDR3
+          [HDD] => 2x2TBSATA2
+          [Location] => AmsterdamAMS-01
+          [Price] => €49.99
+          */
+
+          // remove the previous results
+          $('#resultsTable tbody').html("");
+
+          console.log("result: ", result);
+
+          const resultLength = Object.keys(result).length;
+          console.log("resultLength: ", resultLength);
+          if(resultLength > 0)
+          {
+            for (let i = 0; i < resultLength; i++)
+            {
+              const key = Object.keys(result)[i];
+              const value = result[key];
+
+              console.log("key: ", key);
+              console.log("value: ", value);
+
+              const row = $('<tr>');
+              row.append('<td>' + value.Model + '</td>');
+              row.append('<td>' + value.RAM + '</td>');
+              row.append('<td>' + value.HDD + '</td>');
+              row.append('<td>' + value.Location + '</td>');
+              row.append('<td>' + value.Price + '</td>');
+              row.append('</tr>');
+              $('#resultsTable tbody').append(row);
+            }
+
+            $("#resultsFromExcel").show();
+          }
+          else
+          {
+            console.log("The variable 'result' is empty or does not exist!");
+            $("#resultsFromExcel").hide();
+          }
+
+        },
+        error: function(jqXHR, textStatus, errorThrown)
+        {
+          console.log('Error making Ajax call: ' + errorThrown);
+        }
+      });
+    });
+  });
+
+</script>
