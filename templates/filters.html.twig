@@ -47,6 +47,11 @@
             {% endfor %}
           </select>
 
+          <label>Location</label>:
+          <select id="filter_location" name="filter_location" class="select_location form-control">
+              <option value="(any)" selected>(any)</option>
+          </select>
+
         {% endif %}
       </div>
       <br>
@@ -62,11 +67,7 @@
         <table id="resultsTable" class="table mt-5">
             <thead class="thead-dark">
             <tr>
-                <th>Model</th>
-                <th>RAM</th>
-                <th>HDD</th>
-                <th>Location</th>
-                <th>Price</th>
+                <th>Model</th><th>RAM</th><th>HDD</th><th>Location</th><th>Price</th>
             </tr>
             </thead>
             <tbody>
@@ -101,8 +102,65 @@
     //filters_form.submit();
   }
 
+  function populateTable(data)
+  {
+    result = Object.keys(data);
+
+    //console.log("result (function 'populateTable'): ", result);
+    //console.log("data (function 'populateTable'): ", data);
+
+    $('#resultsTable tbody').html(""); // reset results table
+
+    const resultLength = result.length;
+    console.log("resultLength: ", resultLength);
+    if(resultLength > 0)
+    {
+      for (let i = 0; i < resultLength; i++)
+      {
+        const key = result[i];
+        const value = data[key];
+
+        //console.log("key: ", key); console.log("value: ", value);
+
+        const row = $('<tr>');
+        row.append('<td>' + value.Model + '</td>');
+        row.append('<td>' + value.RAM + '</td>');
+        row.append('<td>' + value.HDD + '</td>');
+        row.append('<td>' + value.Location + '</td>');
+        row.append('<td>' + value.Price + '</td>');
+        row.append('</tr>');
+        $('#resultsTable tbody').append(row);
+      }
+
+      $("#resultsFromExcel").show();
+
+      // add location options to 'Location' drop down list
+      // <option value="(any)" selected>(any)</option>
+      var options = {
+          'Dallas': 'Dallas',
+          'Washington': 'Washington',
+          'Hong Kong': 'Hong Kong'
+      };
+      var selectOption = $('#filter_location');
+      selectOption.empty(); // reset drop down liat
+      selectOption.append('<option value="(any)" selected>(any)</option>'); // add back the default value
+      $.each(options, function (val, text) {
+          selectOption.append(
+              $('<option></option>').val(val).html(text)
+          );
+      });
+    }
+    else
+    {
+      console.log("The variable 'result' (data) is empty or does not exist!");
+      $("#resultsFromExcel").hide();
+    }
+  }
+
   $(document).ready(function()
   {
+    window.ajaxResponseResult = "";
+
     $('#form_button').click(function()
     {
       setValues();
@@ -123,48 +181,21 @@
         success: function(result, textStatus, jqXHR)
         {
           /*
-          [Model] => Dell R210Intel Xeon X3440
-          [RAM] => 16GBDDR3
-          [HDD] => 2x2TBSATA2
-          [Location] => AmsterdamAMS-01
-          [Price] => €49.99
+            [Model] => Dell R210Intel Xeon X3440
+            [RAM] => 16GBDDR3
+            [HDD] => 2x2TBSATA2
+            [Location] => AmsterdamAMS-01
+            [Price] => €49.99
           */
 
           // remove the previous results
-          $('#resultsTable tbody').html("");
+          //$('#resultsTable tbody').html("");
 
-          console.log("result: ", result);
+          //console.log("result: ", result);
 
-          const resultLength = Object.keys(result).length;
-          console.log("resultLength: ", resultLength);
-          if(resultLength > 0)
-          {
-            for (let i = 0; i < resultLength; i++)
-            {
-              const key = Object.keys(result)[i];
-              const value = result[key];
+          ajaxResponseResult = result;
 
-              console.log("key: ", key);
-              console.log("value: ", value);
-
-              const row = $('<tr>');
-              row.append('<td>' + value.Model + '</td>');
-              row.append('<td>' + value.RAM + '</td>');
-              row.append('<td>' + value.HDD + '</td>');
-              row.append('<td>' + value.Location + '</td>');
-              row.append('<td>' + value.Price + '</td>');
-              row.append('</tr>');
-              $('#resultsTable tbody').append(row);
-            }
-
-            $("#resultsFromExcel").show();
-          }
-          else
-          {
-            console.log("The variable 'result' is empty or does not exist!");
-            $("#resultsFromExcel").hide();
-          }
-
+          populateTable(ajaxResponseResult);
         },
         error: function(jqXHR, textStatus, errorThrown)
         {
@@ -172,6 +203,39 @@
         }
       });
     });
+  });
+
+  $("#filter_location").on("change", function(){
+    //alert("The location was changed.");
+    var location = this.value;
+    console.log("Location chosen: ", location);
+
+    // reset original response table (from ajax function in controller)
+    populateTable(ajaxResponseResult);
+
+    // set this drop down's chosen value (gets reset by function 'populateTable')
+    $("#filter_location").val(location);
+
+    $("#resultsTable tbody tr").each(function () {
+    var removeRow = true; // Flag to determine if the row should be removed
+
+        $('td', this).each(function () {
+            var value = $(this).html();
+            //console.log("td cell value: ", value);
+
+            if(value.includes(location))
+            {
+                removeRow = false; // Set the flag to false if any cell contains the location
+                return false; // Exit the inner loop early because we don't need to check other cells
+            }
+        });
+
+        if (removeRow) {
+            $(this).remove(); // Remove the current row if the flag is true
+        }
+    });
+
+
   });
 
 </script>
